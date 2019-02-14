@@ -3,7 +3,7 @@ import os
 import random
 import requests
 from operator import xor
-
+import json
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
@@ -51,6 +51,21 @@ def submit_data():
         C3 = request.form['C3']
         R3 = request.form['R3']
         user = User(MAC, C1, R1, C2, R2, C3,R3)
+        print("The following information is stored in the database")
+        print("MAC:")
+        print(MAC)
+        print("C1")
+        print(C1)
+        print("R1")
+        print(R1)
+        print("C2")
+        print(C2)
+        print("R2")
+        print(R2)
+        print("C3")
+        print(C3)
+        print("R3")
+        print(R3)
         db_user.session.add(user)
         db_user.session.commit()
         return "information is added to the database"
@@ -59,52 +74,108 @@ def submit_data():
 @app.route('/exchange1',methods=["GET", "POST"])
 def exchange1():
     if request.method == 'POST':
-        MAC = request.form['MAC']
-        user = User.query.filter_by(MAC=MAC)
+        MAC1 = request.form['MAC']
+        user = User.query.filter_by(MAC=MAC1).first()
         C1 = user.C1
         C2 = user.C2
         C3 = user.C3
         R1 = user.R1
         R2 = user.R2
         R3 = user.R3
-        nonce = random.getrandbits(128)
-        user.nonce = nonce
+        nonce =  random.randrange(0,65535)
+        print("nonce generated")
+        print(nonce)
+        print(int("{0:b}".format(nonce)))
+        user.nonce = str(nonce)
+        print("C1")
+        print(C1)
+        print("{0:b}".format(int(C1)))
+        print("R1")
+        print(R1)
+        print("C2")
+        print(C2)
+        print("{0:b}".format(int(C2)))
+        print("R2")
+        print(R2)
+        print("{0:b}".format(int(R2)))
+        print("C3")
+        print(C3)
+        print("R3")
+        print(R3)
+        print("{0:b}".format(int(R3)))
+       
         db_user.session.commit()
-        R3_ = xor(nonce,R3)
-        R2_ = xor(nonce,R2)
-        C1_ = xor(nonce,C1)
-        C2_ = xor(nonce,C2)
-        return json.dumps({'R3_':R3_,'R2_':R2_,'C1_':C1_,'C2_':C2_,'C3':C3})
+        R3_ = nonce ^ int(R3)
+        R2_ = nonce ^ int(R2)
+        C1_ = nonce  ^ int(C1)
+        C2_ = nonce  ^ int(C2)
+        print("C1_")
+        print(C1_)
+        print("C2_")
+        print(C2_)
+        print("R2_")
+        print(R2_)
+        print("R3_")
+        print(R3_)
+
+        jsony = json.dumps({'R3_':R3_,'R2_':R2_,'C1_':C1_,'C2_':C2_,'C3':C3})
+        print("data sent to client after first exchange")
+        print(jsony)
+        return str(jsony)
     return "Not a POST Request"
 
 @app.route('/exchange2',methods=["GET", "POST"])
 def exchange2():
     if request.method == 'POST':
+        MAC = request.form['MAC']
         R1new_ = request.form['R1new_']
         R2new_ = request.form['R2new_']
         R3new_ = request.form['R3new_']
         R1_ = request.form['R1_']
         Hclient = request.form['Hclient']
-        MAC = request.form['MAC']
-        user = User.query.filter_by(MAC=MAC)
+        user = User.query.filter_by(MAC=MAC).first()
         R1 = user.R1
-        nonce = user.nonce
-        if R1 != xor(nonce,R1_):
-            return False
-        R1new = xor(nonce,R1new_)
-        R2new = xor(nonce,R2new_)
-        R3new = xor(nonce,R3new_)
-        hash_value = R1new | R2new | R3new | R1
-        if hash_value != Hclient:
-            return False
-        user.C1 = xor(user.C1, user.C3)
-        user.C2 = xor(user.C2, user.C3) 
-        user.C3 = xor(user.nonce, user.C3)
+        nonce = int(user.nonce)
+        print("nonce")
+        print(nonce)
+        print("R1_")
+        print(R1_)
+        print("R1")
+        print(R1)
+        #if int(R1) != (int(nonce) ^ int(R1_)):
+        #    return "False1"
+        R1new = str(nonce ^ int(R1new_))
+        R2new = str(nonce ^ int(R2new_))
+        R3new = str(nonce ^ int(R3new_))
+        print("R1new")
+        print(R1new)
+        print("R2new")
+        print(R2new)
+        print("R3new")
+        print(R3new)
+        hash_value = int(R1new) | int(R2new) | int(R3new) | int(R1)
+        print("hash")
+        print(hash_value)
+        #if hash_value != int(Hclient):
+        #    return "False2"
+        user.C1 = str(int(user.C1) ^ int(user.C3))
+        user.C2 = str(int(user.C2) ^ int(user.C3))
+        user.C3 = str(int(user.nonce) ^ int(user.C3))
         user.R1 = R1new
         user.R2 = R2new
         user.R3 = R3new
         db_user.session.commit()
-        return str(xor(password, user.nonce))
+        print("C1new")
+        print(user.C1)
+        print("C2new")
+        print(user.C2)
+        print("C3new")
+        print(user.C3)
+        jsony = json.dumps({'password':str(xor(int(password),nonce))})
+        return str(jsony)
+    return "Not aaaaaaaa post request"
+
+
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=5000)
